@@ -1,6 +1,7 @@
 import argparse
 import torch
 from pymatgen.core.periodic_table import Element
+from pymatgen.core import Lattice, Structure
 
 from cdvae.common.data_utils import frac_to_cart_coords
 
@@ -36,6 +37,8 @@ def main(gen_path, args):
         id_cart_coords = cart_coords.numpy()[
             indice_tuples[id_needed][0] : indice_tuples[id_needed][1]
         ]
+        id_lengths = lengths[0].numpy()[id_needed]
+        id_angles = angles[0].numpy()[id_needed]
 
         if args.output_format == "xyz": # write xyz file
             f = open(args.output_path + "crystal" + str(id_needed) + ".xyz", "w")
@@ -49,14 +52,14 @@ def main(gen_path, args):
             # default (or at least I think so)
             f.write("\n_symmetry_space_group_name_H-M \t 'P 1' ") 
             f.write("\n_symmetry_Int_Tables_number \t 1")
-            f.write("\n_symmetry_cell_setting \t triclininc")
+            f.write("\n_symmetry_cell_setting \t triclinic")
             # crystal structure
-            f.write("\n_cell_length_a \t"+ str(float(lengths[0][id_needed][0])))
-            f.write("\n_cell_length_b \t"+ str(float(lengths[0][id_needed][1])))
-            f.write("\n_cell_length_c \t"+ str(float(lengths[0][id_needed][2])))
-            f.write("\n_cell_angle_alpha \t"+ str(float(angles[0][id_needed][0])))
-            f.write("\n_cell_angle_beta \t"+ str(float(angles[0][id_needed][1])))
-            f.write("\n_cell_angle_gamma \t"+ str(float(angles[0][id_needed][2])))
+            f.write("\n_cell_length_a \t"+ str(float(id_lengths[0])))
+            f.write("\n_cell_length_b \t"+ str(float(id_lengths[1])))
+            f.write("\n_cell_length_c \t"+ str(float(id_lengths[2])))
+            f.write("\n_cell_angle_alpha \t"+ str(float(id_angles[0])))
+            f.write("\n_cell_angle_beta \t"+ str(float(id_angles[1])))
+            f.write("\n_cell_angle_gamma \t"+ str(float(id_angles[2])))
             # atoms information
             #   first declare the entries of the properties printed of each atom
             f.write("\n\nloop_ \n _atom_site_label \n _atom_site_type_symbol \n _atom_site_fract_x \n _atom_site_fract_y \n _atom_site_fract_z")
@@ -65,6 +68,24 @@ def main(gen_path, args):
                 atom_symbol = atomic_number_to_symbol[id_atom_types[i]]
                 f.write("\n %s %s %.9f %.9f %.9f" % ("Atom"+str(i), atom_symbol, id_fracs[i, 0], id_fracs[i, 1], id_fracs[i, 2] ))
         f.close()
+
+        #create a pymatgen structure
+        struct = Structure(
+           lattice=Lattice.from_parameters(
+                id_lengths[0],
+                id_lengths[1],
+                id_lengths[2],
+                id_angles[0],
+                id_angles[1],
+                id_angles[2],
+            ),
+            species=id_atom_types,
+            coords=id_fracs,
+            coords_are_cartesian=False
+        )
+        # writing the struct to a cif file (alternative to manually writing the file)
+        struct.to(filename=args.output_path + "PYMATGEN_crystal" + str(id_needed) + ".cif") 
+
 if __name__ == '__main__':
     gen_path = "/Users/luisaorozco/Documents/Projects/DeepMolGen/cdvae/hydra/model/eval_gen.pt"
     out_path = "/Users/luisaorozco/Documents/Projects/DeepMolGen/cdvae/hydra/model/generated_samples/"
